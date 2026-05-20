@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum TransactionType {
+  AD_REWARD
+  REFERRAL_REWARD
+  DAILY_BONUS
+  WITHDRAWAL
+  ADMIN_ADJUSTMENT
+  TRANSFER_SENT
+  TRANSFER_RECEIVED
+}
+
+model User {
+  id            String   @id @default(uuid())
+  telegramId    BigInt   @unique
+  username      String?
+  firstName     String?
+  photoUrl      String?
+  languageCode  String?
+  balance       Decimal  @default(0) @db.Decimal(18, 8)
+  referralCode  String   @unique
+  referredById  String?
+  referredBy    User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]   @relation("Referrals")
+  
+  isAdmin       Boolean  @default(false)
+  isBanned      Boolean  @default(false)
+  isVip         Boolean  @default(false)
+  vipTier       Int      @default(0)
+  
+  lastAdWatch   DateTime?
+  dailyAdsCount Int      @default(0)
+  lastDailyClaim DateTime?
+  streak        Int      @default(0)
+  vipEarnings   Decimal  @default(0) @db.Decimal(18, 8)
+
+  transactions  Transaction[]
+  withdrawals   Withdrawal[]
+  adRewards     AdReward[]
+  notifications Notification[]
+  taskCompletions TaskCompletion[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([telegramId])
+  @@index([referralCode])
+}
+
+model AdReward {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Decimal  @db.Decimal(18, 8)
+  network   String   @default("monetag")
+  adId      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  amount    Decimal         @db.Decimal(18, 8)
+  type      TransactionType
+  status    String          @default("COMPLETED")
+  metadata  Json?
+  createdAt DateTime        @default(now())
+
+  @@index([userId])
+}
+
+model Withdrawal {
+  id            String           @id @default(uuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id])
+  amount        Decimal          @db.Decimal(18, 8)
+  fee           Decimal          @db.Decimal(18, 8)
+  status        WithdrawalStatus @default(PENDING)
+  method        String
+  walletAddress String
+  adminNote     String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([userId])
+}
+
+model Setting {
+  key   String @id
+  value Json
+}
+
+model FraudLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  reason    String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   @default("info")
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SponsorTask {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  reward      Decimal  @db.Decimal(18, 8)
+  link        String
+  type        String   @default("subscribe")
+  isActive    Boolean  @default(true)
+  totalClaims Int      @default(0)
+  completions TaskCompletion[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TaskCompletion {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  taskId    String
+  sponsorTask SponsorTask @relation(fields: [taskId], references: [id])
+  completedAt DateTime @default(now())
+
+  @@unique([userId, taskId])
+  @@index([userId])
+  @@index([taskId])
+}
