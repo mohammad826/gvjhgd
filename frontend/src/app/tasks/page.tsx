@@ -135,24 +135,22 @@ export default function TasksPage() {
 
       const interval = setInterval(() => {
         setTasks((prev) => {
-          let target: Task | null = null;
+          let shouldClear = false;
           const updated = prev.map((t) => {
             if (t.id === task.id) {
-              target = t;
               if (t.timer <= 1) {
-                clearInterval(interval);
-                timerRefs.current.delete(task.id);
+                shouldClear = true;
                 return { ...t, status: "CLAIM" as const, timer: 0 };
               }
               return { ...t, timer: t.timer - 1 };
             }
             return t;
           });
-          if (target && target.timer <= 1) {
+          if (shouldClear) {
             clearInterval(interval);
             timerRefs.current.delete(task.id);
           }
-          return updated as Task[];
+          return updated;
         });
       }, 1000);
       timerRefs.current.set(task.id, interval);
